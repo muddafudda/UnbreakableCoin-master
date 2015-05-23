@@ -1117,6 +1117,30 @@ unsigned int static GetNextWorkRequired(const CBlockIndex* pindexLast, const CBl
     // Genesis block
     if (pindexLast == NULL)
         return nProofOfWorkLimit;
+    // Unbreakablecoin difficulty adjustment protocol switch
+    int64 nDiffSwitchBlock = 10500000; // You just need to change this height Jim to the height of the fork.
+    int nHeight = pindexLast->nHeight + 1;
+    bool fNewDifficultyProtocol = (nHeight >= nDiffSwitchBlock || fTestNet);
+    
+    //Starting at block 10500000 retarget every block with exponential moving toward target spacing
+    if (fNewDifficultyProtocol)
+    {
+        if (pindexLast->pprev == NULL)
+            return nProofOfWorkLimit; // first block after genesis (for testnet)
+            
+        int64 nActualSpacing = pindexLast->GetBlockTime() - pindexLast->pprev->GetBlockTime();
+        
+        CBigNum bnNew;
+        bnNew.SetCompact(pindexLast->nBits);
+        
+        bnNew *= ((nInterval - 1) * nTargetSpacing + nActualSpacing + nActualSpacing);
+        bnNew /= ((nInterval + 1) * nTargetSpacing);
+
+        if (bnNew > bnProofOfWorkLimit) 
+            bnNew = bnProofOfWorkLimit;
+
+        return bnNew.GetCompact();
+    }
 
     // Only change once per interval
     if ((pindexLast->nHeight+1) % nInterval != 0)
